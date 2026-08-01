@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advanced Korean Flashcard App</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 800px; }
+
+    header { text-align: center; margin-bottom: 24px; }
+    h1 { font-size: 2rem; color: var(--text); margin-bottom: 8px; }
+    p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+    .nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .tab-btn { background: none; border: none; color: var(--text-muted); padding: 10px 16px; font-size: 1rem; font-weight: 600; cursor: pointer; border-radius: 6px; }
+    .tab-btn.active { background-color: var(--accent); color: white; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-muted); }
+    input, textarea { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem; }
+    input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 70px; }
+
+    .btn { background: var(--accent); color: white; border: none; padding: 12px 20px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; width: 100%; transition: background 0.2s; }
+    .btn:hover { background: var(--accent-hover); }
+
+    .search-bar { margin-bottom: 16px; }
+    .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .deck-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; position: relative; }
+    .deck-card h3 { font-size: 1.3rem; margin-bottom: 4px; color: #60a5fa; }
+    .deck-card .hanja { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 8px; }
+    .deck-card .def { font-weight: 600; margin-bottom: 8px; }
+    .deck-card .ex { font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
+    .delete-btn { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; }
+
+    /* Flashcard Study Area */
+    .study-box { perspective: 1000px; width: 100%; height: 320px; margin-bottom: 20px; cursor: pointer; }
+    .flashcard { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.6s; }
+    .flashcard.flipped { transform: rotateY(180deg); }
+    .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 16px; border: 1px solid var(--border); background: var(--card-bg); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px; text-align: center; }
+    .card-back { transform: rotateY(180deg); }
+    
+    .card-face .main-word { font-size: 2.5rem; font-weight: bold; margin-bottom: 8px; color: #60a5fa; }
+    .card-face .sub-text { color: var(--text-muted); font-size: 1.1rem; }
+    
+    .study-controls { display: flex; gap: 12px; justify-content: center; }
+    .action-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; }
+    .btn-review { background: var(--warning); }
+    .btn-master { background: var(--success); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Korean Vocab Builder</h1>
+      <p class="subtitle">Curate advanced Korean vocabulary, Hanja, and contextual nuances.</p>
+    </header>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('manage')">Manage Deck</button>
+      <button class="tab-btn" onclick="switchTab('study')">Study Mode (<span id="deck-count">0</span>)</button>
+    </div>
+
+    <!-- TAB 1: MANAGE & ADD -->
+    <div id="manage-tab" class="tab-content active">
+      <div class="card-panel">
+        <h2 style="margin-bottom: 16px; font-size: 1.2rem;">Add New Card</h2>
+        <form id="vocab-form">
+          <div class="form-group">
+            <label for="kr-word">Korean Word / Expression *</label>
+            <input type="text" id="kr-word" required placeholder="e.g. 감개무량" />
+          </div>
+          <div class="form-group">
+            <label for="hanja">Hanja / Root (Optional)</label>
+            <input type="text" id="hanja" placeholder="e.g. 感慨無量" />
+          </div>
+          <div class="form-group">
+            <label for="eng-def">English Definition & Nuance *</label>
+            <input type="text" id="eng-def" required placeholder="e.g. Filled with deep/overwhelming emotion" />
+          </div>
+          <div class="form-group">
+            <label for="example">Context / Example Sentence (Optional)</label>
+            <textarea id="example" placeholder="e.g. 합격 소식을 듣고 감개무량이었습니다."></textarea>
+          </div>
+          <button type="submit" class="btn">Add to Deck</button>
+        </form>
+      </div>
+
+      <input type="text" id="search-input" class="search-bar" placeholder="Search deck..." oninput="renderDeck()" />
+      <div id="deck-grid" class="deck-grid"></div>
+    </div>
+
+    <!-- TAB 2: STUDY MODE -->
+    <div id="study-tab" class="tab-content">
+      <div id="study-container">
+        <div class="study-box" onclick="flipCard()">
+          <div id="flashcard" class="flashcard">
+            <div class="card-face card-front">
+              <div id="front-word" class="main-word">---</div>
+              <div id="front-hanja" class="sub-text"></div>
+              <p style="margin-top: 20px; font-size: 0.8rem; color: var(--text-muted);">(Click to flip)</p>
+            </div>
+            <div class="card-face card-back">
+              <div id="back-def" class="main-word" style="font-size: 1.5rem; color: var(--text);">---</div>
+              <div id="back-example" class="sub-text" style="font-style: italic; margin-top: 12px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="study-controls">
+          <button class="action-btn btn-review" onclick="nextCard(false)">Need Review</button>
+          <button class="action-btn btn-master" onclick="nextCard(true)">Got It</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let deck = JSON.parse(localStorage.getItem('kr_vocab_deck')) || [
+      { id: 1, kr: "감개무량", hanja: "感慨無量", def: "Filled with deep, overwhelming emotion", ex: "10년 만에 고국에 돌아오니 감개무량하다." },
+      { id: 2, kr: "유언비어", hanja: "流言蜚語", def: "Groundless rumor / scuttlebutt", ex: "SNS에 떠도는 유언비어에 미혹되지 마라." }
+    ];
+
+    let currentIndex = 0;
+
+    function saveDeck() {
+      localStorage.setItem('kr_vocab_deck', JSON.stringify(deck));
+      document.getElementById('deck-count').innerText = deck.length;
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      if (tab === 'manage') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('manage-tab').classList.add('active');
+        renderDeck();
+      } else {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('study-tab').classList.add('active');
+        initStudy();
+      }
+    }
+
+    document.getElementById('vocab-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const newCard = {
+        id: Date.now(),
+        kr: document.getElementById('kr-word').value.trim(),
+        hanja: document.getElementById('hanja').value.trim(),
+        def: document.getElementById('eng-def').value.trim(),
+        ex: document.getElementById('example').value.trim()
+      };
+      deck.unshift(newCard);
+      saveDeck();
+      renderDeck();
+      e.target.reset();
+    });
+
+    function deleteCard(id) {
+      deck = deck.filter(card => card.id !== id);
+      saveDeck();
+      renderDeck();
+    }
+
+    function renderDeck() {
+      const query = document.getElementById('search-input').value.toLowerCase();
+      const grid = document.getElementById('deck-grid');
+      grid.innerHTML = '';
+
+      const filtered = deck.filter(c => c.kr.toLowerCase().includes(query) || c.def.toLowerCase().includes(query));
+
+      filtered.forEach(card => {
+        const el = document.createElement('div');
+        el.className = 'deck-card';
+        el.innerHTML = `
+          <button class="delete-btn" onclick="deleteCard(${card.id})">&times;</button>
+          <h3>${card.kr}</h3>
+          ${card.hanja ? `<div class="hanja">[${card.hanja}]</div>` : ''}
+          <div class="def">${card.def}</div>
+          ${card.ex ? `<div class="ex">"${card.ex}"</div>` : ''}
+        `;
+        grid.appendChild(el);
+      });
+      document.getElementById('deck-count').innerText = deck.length;
+    }
+
+    /* Study Mode Functions */
+    function initStudy() {
+      if (deck.length === 0) {
+        document.getElementById('front-word').innerText = "No cards available!";
+        document.getElementById('front-hanja').innerText = "Add cards in the Manage tab.";
+        document.getElementById('back-def').innerText = "";
+        document.getElementById('back-example').innerText = "";
+        return;
+      }
+      currentIndex = 0;
+      showCard();
+    }
+
+    function showCard() {
+      const card = deck[currentIndex];
+      const flashcard = document.getElementById('flashcard');
+      flashcard.classList.remove('flipped');
+
+      setTimeout(() => {
+        document.getElementById('front-word').innerText = card.kr;
+        document.getElementById('front-hanja').innerText = card.hanja ? `[${card.hanja}]` : '';
+        document.getElementById('back-def').innerText = card.def;
+        document.getElementById('back-example').innerText = card.ex ? `"${card.ex}"` : '';
+      }, 150);
+    }
+
+    function flipCard() {
+      document.getElementById('flashcard').classList.toggle('flipped');
+    }
+
+    function nextCard(mastered) {
+      if (deck.length === 0) return;
+      currentIndex = (currentIndex + 1) % deck.length;
+      showCard();
+    }
+
+    // Initialize initial render
+    saveDeck();
+    renderDeck();
+  </script>
+</body>
+</html>
