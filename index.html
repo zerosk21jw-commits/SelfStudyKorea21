@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Korean Flashcard App</title>
+  <title>Korean Flashcards</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -38,8 +38,24 @@
     input { width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1.1rem; }
     input:focus { outline: none; border-color: var(--accent); }
 
-    .btn { background: var(--accent); color: white; border: none; padding: 12px 20px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; width: 100%; transition: background 0.2s; }
+    /* Translation Preview Box */
+    .preview-box {
+      background: #0f172a;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .preview-box.active { display: block; }
+    .preview-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; margin-bottom: 4px; }
+    .preview-text { font-size: 1.1rem; color: #60a5fa; font-weight: 500; }
+
+    .btn-group { display: flex; gap: 10px; }
+    .btn { background: var(--accent); color: white; border: none; padding: 12px 20px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; flex: 1; transition: background 0.2s; }
     .btn:hover { background: var(--accent-hover); }
+    .btn-secondary { background: #334155; }
+    .btn-secondary:hover { background: #475569; }
 
     .search-bar { margin-bottom: 16px; }
     .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
@@ -82,9 +98,19 @@
         <form id="vocab-form">
           <div class="form-group">
             <label for="kr-word">Korean Word</label>
-            <input type="text" id="kr-word" required placeholder="e.g. 감개무량" />
+            <input type="text" id="kr-word" required placeholder="e.g. 감개무량" onblur="fetchPreview()" />
           </div>
-          <button type="submit" id="submit-btn" class="btn">Add to Deck</button>
+
+          <!-- Definition Preview Area -->
+          <div id="preview-box" class="preview-box">
+            <div class="preview-label">Translation Preview</div>
+            <div id="preview-text" class="preview-text">---</div>
+          </div>
+
+          <div class="btn-group">
+            <button type="button" id="trans-btn" class="btn btn-secondary" onclick="fetchPreview()">Translate</button>
+            <button type="submit" id="submit-btn" class="btn" disabled>Add to Deck</button>
+          </div>
         </form>
       </div>
 
@@ -118,6 +144,7 @@
   <script>
     let deck = JSON.parse(localStorage.getItem('kr_vocab_deck')) || [];
     let currentIndex = 0;
+    let currentTranslation = "";
 
     function saveDeck() {
       localStorage.setItem('kr_vocab_deck', JSON.stringify(deck));
@@ -139,7 +166,7 @@
       }
     }
 
-    // Auto translate using free Google Translate endpoint
+    // Free Google Translate API call
     async function translateKorean(text) {
       const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=en&dt=t&q=${encodeURIComponent(text)}`;
       const res = await fetch(url);
@@ -147,34 +174,58 @@
       return data[0][0][0];
     }
 
-    document.getElementById('vocab-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    // Fetch and display translation preview
+    async function fetchPreview() {
       const inputEl = document.getElementById('kr-word');
+      const transBtn = document.getElementById('trans-btn');
       const submitBtn = document.getElementById('submit-btn');
+      const previewBox = document.getElementById('preview-box');
+      const previewText = document.getElementById('preview-text');
       const krWord = inputEl.value.trim();
 
       if (!krWord) return;
 
-      submitBtn.innerText = "Translating...";
-      submitBtn.disabled = true;
+      transBtn.innerText = "Translating...";
+      transBtn.disabled = true;
 
       try {
-        const engDef = await translateKorean(krWord);
-        const newCard = {
-          id: Date.now(),
-          kr: krWord,
-          def: engDef
-        };
-        deck.unshift(newCard);
-        saveDeck();
-        renderDeck();
-        inputEl.value = '';
-      } catch (err) {
-        alert("Failed to translate word. Please try again.");
-      } finally {
-        submitBtn.innerText = "Add to Deck";
+        currentTranslation = await translateKorean(krWord);
+        previewText.innerText = currentTranslation;
+        previewBox.classList.add('active');
         submitBtn.disabled = false;
+      } catch (err) {
+        previewText.innerText = "Error fetching translation.";
+        previewBox.classList.add('active');
+        submitBtn.disabled = true;
+      } finally {
+        transBtn.innerText = "Translate";
+        transBtn.disabled = false;
       }
+    }
+
+    // Submit & Save to LocalStorage
+    document.getElementById('vocab-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inputEl = document.getElementById('kr-word');
+      const krWord = inputEl.value.trim();
+
+      if (!krWord || !currentTranslation) return;
+
+      const newCard = {
+        id: Date.now(),
+        kr: krWord,
+        def: currentTranslation
+      };
+      
+      deck.unshift(newCard);
+      saveDeck();
+      renderDeck();
+
+      // Reset Form State
+      inputEl.value = '';
+      currentTranslation = "";
+      document.getElementById('preview-box').classList.remove('active');
+      document.getElementById('submit-btn').disabled = true;
     });
 
     function deleteCard(id) {
